@@ -1,0 +1,26 @@
+version: 0.2
+
+env:
+  parameter-store:
+    github_pat: github_pat
+    github_username: github_username
+    DOCKER_USERNAME: docker_username
+    DOCKER_PASSWORD: docker_password
+
+phases:
+  pre_build:
+    commands:
+      - git config --global user.email "mggdev-aws@mggdev.cloud"
+      - git config --global user.name "mggdev-aws"
+  install:
+    runtime-versions:
+      java: corretto11
+  build:
+    commands:
+      - echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+      - mvn -B install -DskipTests
+      - chmod +x fishflicks-build/target/codepipeline/buildspec-branch.sh
+      - fishflicks-build/target/codepipeline/buildspec-branch.sh "$github_pat" "$github_username"
+artifacts:
+  files:
+    - '**/*'

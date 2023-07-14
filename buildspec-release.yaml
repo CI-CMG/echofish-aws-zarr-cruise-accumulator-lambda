@@ -1,0 +1,30 @@
+version: 0.2
+
+env:
+  parameter-store:
+    gpg_key: gpg_key
+    gpg_key_id: gpg_key_id
+    gpg_key_pw: gpg_key_pw
+    github_pat: github_pat
+    github_username: github_username
+    DOCKER_USERNAME: docker_username
+    DOCKER_PASSWORD: docker_password
+
+phases:
+  pre_build:
+    commands:
+      - echo "$gpg_key" | base64 -d > /tmp/gpg.key
+      - git config --global user.email "mggdev-aws@mggdev.cloud"
+      - git config --global user.name "mggdev-aws"
+  install:
+    runtime-versions:
+      java: corretto11
+  build:
+    commands:
+      - echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+      - mvn -B install -Pit
+      - chmod +x fishflicks-build/target/codepipeline/buildspec-release.sh
+      - fishflicks-build/target/codepipeline/buildspec-release.sh "$gpg_key" "$gpg_key_id" "$gpg_key_pw" "$github_pat" "$github_username"
+artifacts:
+  files:
+    - '**/*'

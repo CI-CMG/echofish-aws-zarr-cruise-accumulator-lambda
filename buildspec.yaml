@@ -1,0 +1,18 @@
+version: 0.2
+
+env:
+  parameter-store:
+    DOCKER_USERNAME: docker_username
+    DOCKER_PASSWORD: docker_password
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+  build:
+    commands:
+      - echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+      - mvn -B deploy -Pit
+artifacts:
+  files:
+    - '**/*'
