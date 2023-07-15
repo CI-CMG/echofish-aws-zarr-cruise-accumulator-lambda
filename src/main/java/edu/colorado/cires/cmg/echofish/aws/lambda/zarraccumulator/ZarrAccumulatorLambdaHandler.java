@@ -10,11 +10,15 @@ import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedScanList;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import edu.colorado.cires.cmg.echofish.data.dynamo.FileInfoRecord;
 import edu.colorado.cires.cmg.echofish.data.model.CruiseProcessingMessage;
+import edu.colorado.cires.cmg.echofish.data.model.SnsErrorMessage;
 import edu.colorado.cires.cmg.echofish.data.s3.S3Operations;
 import edu.colorado.cires.cmg.echofish.data.sns.SnsNotifierFactory;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,10 +52,12 @@ public class ZarrAccumulatorLambdaHandler {
       throw new IllegalArgumentException("sensorName is required");
     }
 
-    if (isCruiseComplete(message)) {
+    CruiseProcessingStatus processingStatus = isCruiseComplete(message);
+    if (processingStatus.isCruiseComplete()) {
+      processingStatus.getCompletedFiles().forEach(this::setProcessingFileStatus);
       message.setFileName(null);
-      notifyTopic(message);
       LOGGER.info("Notifying: {}", message);
+      notifyTopic(message);
     }
 
     LOGGER.info("Finished Event: {}", message);
@@ -62,7 +68,105 @@ public class ZarrAccumulatorLambdaHandler {
     sns.createNotifier().notify(configuration.getTopicArn(), message);
   }
 
-  private boolean isCruiseComplete(CruiseProcessingMessage message) {
+  private static class FileKey {
+    private final String fileName;
+    private final String cruiseName;
+
+    public FileKey(String fileName, String cruiseName) {
+      this.fileName = fileName;
+      this.cruiseName = cruiseName;
+    }
+
+    public String getFileName() {
+      return fileName;
+    }
+
+    public String getCruiseName() {
+      return cruiseName;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      FileKey fileKey = (FileKey) o;
+      return Objects.equals(fileName, fileKey.fileName) && Objects.equals(cruiseName, fileKey.cruiseName);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(fileName, cruiseName);
+    }
+
+    @Override
+    public String toString() {
+      return "FileKey{" +
+          "fileName='" + fileName + '\'' +
+          ", cruiseName='" + cruiseName + '\'' +
+          '}';
+    }
+  }
+
+  private static class CruiseProcessingStatus {
+    private final boolean cruiseComplete;
+    private final List<FileKey> completedFiles;
+
+    public CruiseProcessingStatus(boolean cruiseComplete, List<FileKey> completedFiles) {
+      this.cruiseComplete = cruiseComplete;
+      this.completedFiles = completedFiles;
+    }
+
+    public boolean isCruiseComplete() {
+      return cruiseComplete;
+    }
+
+    public List<FileKey> getCompletedFiles() {
+      return completedFiles;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      CruiseProcessingStatus that = (CruiseProcessingStatus) o;
+      return cruiseComplete == that.cruiseComplete && Objects.equals(completedFiles, that.completedFiles);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(cruiseComplete, completedFiles);
+    }
+
+    @Override
+    public String toString() {
+      return "CruiseProcessingStatus{" +
+          "cruiseComplete=" + cruiseComplete +
+          ", completedFiles=" + completedFiles +
+          '}';
+    }
+  }
+
+  private void setProcessingFileStatus(FileKey fileKey) {
+    LOGGER.info("Updating Database: {}", fileKey);
+    DynamoDBMapper mapper = new DynamoDBMapper(client);
+    FileInfoRecord record = mapper.load(
+        FileInfoRecord.class,
+        fileKey.getFileName(),
+        fileKey.getCruiseName(),
+        DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
+    record.setPipelineStatus("BUILDING_CRUISE_ZARR");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
+  }
+
+  private CruiseProcessingStatus isCruiseComplete(CruiseProcessingMessage message) {
     DynamoDBMapper mapper = new DynamoDBMapper(client);
 
     Map<String, AttributeValue> eav = new HashMap<>();
@@ -75,16 +179,30 @@ public class ZarrAccumulatorLambdaHandler {
         .withFilterExpression("CRUISE_NAME = :cruiseName and SHIP_NAME = :shipName and SENSOR_NAME = :sensorName")
         .withExpressionAttributeValues(eav);
 
+
+    List<FileKey> completedFiles = new ArrayList<>();
+    List<FileKey> processingFiles = new ArrayList<>();
+    boolean skip = false;
+
     PaginatedScanList<FileInfoRecord> records = mapper.scan(FileInfoRecord.class, queryExpression, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
     Iterator<FileInfoRecord> it = records.iterator();
-    boolean hasRecord = false;
-    while (it.hasNext()) {
-      hasRecord = true;
+    while (!skip && it.hasNext()) {
       FileInfoRecord record = it.next();
-      if ("PROCESSING".equals(record.getPipelineStatus())) {
-        return false;
+      switch (record.getPipelineStatus()) {
+        case "BUILDING_CRUISE_ZARR":
+          skip = true;
+          break;
+        case "PROCESSING":
+          processingFiles.add(new FileKey(record.getFileName(), record.getCruiseName()));
+          break;
+        case "SUCCESS":
+          completedFiles.add(new FileKey(record.getFileName(), record.getCruiseName()));
+          break;
+        default:
+          break;
       }
     }
-    return hasRecord;
+    boolean completed = !skip && !completedFiles.isEmpty() && processingFiles.isEmpty();
+    return new CruiseProcessingStatus(completed, completedFiles);
   }
 }

@@ -1,5 +1,6 @@
 package edu.colorado.cires.cmg.echofish.aws.lambda.zarraccumulator;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.local.embedded.DynamoDBEmbedded;
 import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
 import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
@@ -24,7 +26,10 @@ import edu.colorado.cires.cmg.echofish.data.sns.SnsNotifier;
 import edu.colorado.cires.cmg.echofish.data.sns.SnsNotifierFactory;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,6 +71,82 @@ class ZarrAccumulatorLambdaHandlerTest {
   @Test
   public void testComplete() throws Exception {
 
+    List<FileInfoRecord> expected = new ArrayList<>();
+
+    FileInfoRecord record = new FileInfoRecord();
+    record.setCruiseName("HB0707");
+    record.setShipName("Henry_B._Bigelow");
+    record.setSensorName("EK60");
+    record.setPipelineStatus("SUCCESS");
+    record.setPipelineTime(TIME.toString());
+    record.setFileName("foo");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
+    expected.add(record);
+
+    record = new FileInfoRecord();
+    record.setCruiseName("HB0707");
+    record.setShipName("Henry_B._Bigelow");
+    record.setSensorName("EK60");
+    record.setPipelineStatus("FAILURE");
+    record.setPipelineTime(TIME.toString());
+    record.setFileName("bar");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
+    expected.add(record);
+
+    record = new FileInfoRecord();
+    record.setCruiseName("HB0707");
+    record.setShipName("Henry_B._Bigelow");
+    record.setSensorName("EK60");
+    record.setPipelineStatus("SUCCESS");
+    record.setPipelineTime(TIME.toString());
+    record.setFileName("foobar");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
+    expected.add(record);
+
+    record = new FileInfoRecord();
+    record.setCruiseName("NOT_HB0707");
+    record.setShipName("Henry_B._Bigelow");
+    record.setSensorName("EK60");
+    record.setPipelineStatus("PROCESSING");
+    record.setPipelineTime(TIME.toString());
+    record.setFileName("foobar");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
+    expected.add(record);
+
+
+    SnsNotifier snsNotifier = mock(SnsNotifier.class);
+    when(sns.createNotifier()).thenReturn(snsNotifier);
+
+
+    CruiseProcessingMessage message = new CruiseProcessingMessage();
+    message.setCruiseName("HB0707");
+    message.setShipName("Henry_B._Bigelow");
+    message.setSensorName("EK60");
+    message.setFileName("foo");
+
+    handler.handleRequest(message);
+
+    expected.stream()
+        .filter(r -> r.getCruiseName().equals("HB0707"))
+        .filter(r -> r.getPipelineStatus().equals("SUCCESS"))
+        .forEach(r -> r.setPipelineStatus("BUILDING_CRUISE_ZARR"));
+
+    Set<FileInfoRecord> saved = mapper.scan(FileInfoRecord.class, new DynamoDBScanExpression(),
+        DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config()).stream().collect(Collectors.toSet());
+
+    assertEquals(new HashSet<>(expected), saved);
+
+    CruiseProcessingMessage expectedMessage = new CruiseProcessingMessage();
+    expectedMessage.setCruiseName("HB0707");
+    expectedMessage.setShipName("Henry_B._Bigelow");
+    expectedMessage.setSensorName("EK60");
+
+    verify(snsNotifier).notify(eq(TOPIC_ARN), eq(expectedMessage));
+  }
+
+  @Test
+  public void testNotComplete() throws Exception {
+
     FileInfoRecord record = new FileInfoRecord();
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
@@ -79,7 +160,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus("FAILURE");
+    record.setPipelineStatus("PROCESSING");
     record.setPipelineTime(TIME.toString());
     record.setFileName("bar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -120,17 +201,17 @@ class ZarrAccumulatorLambdaHandlerTest {
     expectedMessage.setShipName("Henry_B._Bigelow");
     expectedMessage.setSensorName("EK60");
 
-    verify(snsNotifier).notify(eq(TOPIC_ARN), eq(expectedMessage));
+    verify(snsNotifier, times(0)).notify(any(), any());
   }
 
   @Test
-  public void testNotComplete() throws Exception {
+  public void testInProgress() throws Exception {
 
     FileInfoRecord record = new FileInfoRecord();
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus("SUCCESS");
+    record.setPipelineStatus("BUILDING_CRUISE_ZARR");
     record.setPipelineTime(TIME.toString());
     record.setFileName("foo");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -139,7 +220,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus("PROCESSING");
+    record.setPipelineStatus("BUILDING_CRUISE_ZARR");
     record.setPipelineTime(TIME.toString());
     record.setFileName("bar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -148,7 +229,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus("SUCCESS");
+    record.setPipelineStatus("BUILDING_CRUISE_ZARR");
     record.setPipelineTime(TIME.toString());
     record.setFileName("foobar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
