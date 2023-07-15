@@ -26,7 +26,7 @@ public class ZarrAccumulatorLambdaHandler {
   private final AmazonDynamoDB client;
   private final ZarrAccumulatorLambdaConfiguration configuration;
 
-  public ZarrAccumulatorLambdaHandler(S3Operations s3, SnsNotifierFactory sns, AmazonDynamoDB client, ZarrAccumulatorLambdaConfiguration configuration) {
+  public ZarrAccumulatorLambdaHandler(SnsNotifierFactory sns, AmazonDynamoDB client, ZarrAccumulatorLambdaConfiguration configuration) {
     this.sns = sns;
     this.client = client;
     this.configuration = configuration;

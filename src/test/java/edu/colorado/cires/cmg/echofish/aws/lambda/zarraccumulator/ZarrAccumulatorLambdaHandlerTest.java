@@ -18,10 +18,8 @@ import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
 import com.amazonaws.services.dynamodbv2.model.KeyType;
 import com.amazonaws.services.dynamodbv2.model.ProvisionedThroughput;
 import com.amazonaws.services.dynamodbv2.model.ScalarAttributeType;
-import edu.colorado.cires.cmg.echofish.aws.test.MockS3Operations;
 import edu.colorado.cires.cmg.echofish.data.dynamo.FileInfoRecord;
 import edu.colorado.cires.cmg.echofish.data.model.CruiseProcessingMessage;
-import edu.colorado.cires.cmg.echofish.data.s3.S3Operations;
 import edu.colorado.cires.cmg.echofish.data.sns.SnsNotifier;
 import edu.colorado.cires.cmg.echofish.data.sns.SnsNotifierFactory;
 import java.time.Instant;
@@ -40,7 +38,6 @@ class ZarrAccumulatorLambdaHandlerTest {
 
   private AmazonDynamoDB dynamo;
   private ZarrAccumulatorLambdaHandler handler;
-  private final S3Operations s3 = new MockS3Operations();
   private SnsNotifierFactory sns;
   private DynamoDBMapper mapper;
 
@@ -52,7 +49,6 @@ class ZarrAccumulatorLambdaHandlerTest {
     mapper = new DynamoDBMapper(dynamo);
     sns = mock(SnsNotifierFactory.class);
     handler = new ZarrAccumulatorLambdaHandler(
-        s3,
         sns,
         dynamo,
         new ZarrAccumulatorLambdaConfiguration(
