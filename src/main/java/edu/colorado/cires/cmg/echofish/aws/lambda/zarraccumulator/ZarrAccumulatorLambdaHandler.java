@@ -3,15 +3,12 @@ package edu.colorado.cires.cmg.echofish.aws.lambda.zarraccumulator;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
-import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedQueryList;
 import com.amazonaws.services.dynamodbv2.datamodeling.PaginatedScanList;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import edu.colorado.cires.cmg.echofish.data.dynamo.FileInfoRecord;
+import edu.colorado.cires.cmg.echofish.data.dynamo.FileInfoRecord.PipelineStatus;
 import edu.colorado.cires.cmg.echofish.data.model.CruiseProcessingMessage;
-import edu.colorado.cires.cmg.echofish.data.model.SnsErrorMessage;
-import edu.colorado.cires.cmg.echofish.data.s3.S3Operations;
 import edu.colorado.cires.cmg.echofish.data.sns.SnsNotifierFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -69,6 +66,7 @@ public class ZarrAccumulatorLambdaHandler {
   }
 
   private static class FileKey {
+
     private final String fileName;
     private final String cruiseName;
 
@@ -112,6 +110,7 @@ public class ZarrAccumulatorLambdaHandler {
   }
 
   private static class CruiseProcessingStatus {
+
     private final boolean cruiseComplete;
     private final List<FileKey> completedFiles;
 
@@ -162,7 +161,7 @@ public class ZarrAccumulatorLambdaHandler {
         fileKey.getFileName(),
         fileKey.getCruiseName(),
         DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
-    record.setPipelineStatus("BUILDING_CRUISE_ZARR");
+    record.setPipelineStatus(PipelineStatus.INITIALIZING_CRUISE_ZARR);
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
   }
 
@@ -174,28 +173,27 @@ public class ZarrAccumulatorLambdaHandler {
     eav.put(":shipName", new AttributeValue().withS(message.getShipName()));
     eav.put(":sensorName", new AttributeValue().withS(message.getSensorName()));
 
-
     DynamoDBScanExpression queryExpression = new DynamoDBScanExpression()
         .withFilterExpression("CRUISE_NAME = :cruiseName and SHIP_NAME = :shipName and SENSOR_NAME = :sensorName")
         .withExpressionAttributeValues(eav);
-
 
     List<FileKey> completedFiles = new ArrayList<>();
     List<FileKey> processingFiles = new ArrayList<>();
     boolean skip = false;
 
-    PaginatedScanList<FileInfoRecord> records = mapper.scan(FileInfoRecord.class, queryExpression, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
+    PaginatedScanList<FileInfoRecord> records = mapper.scan(FileInfoRecord.class, queryExpression,
+        DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
     Iterator<FileInfoRecord> it = records.iterator();
     while (!skip && it.hasNext()) {
       FileInfoRecord record = it.next();
       switch (record.getPipelineStatus()) {
-        case "BUILDING_CRUISE_ZARR":
+        case PipelineStatus.INITIALIZING_CRUISE_ZARR:
           skip = true;
           break;
-        case "PROCESSING":
+        case PipelineStatus.PROCESSING:
           processingFiles.add(new FileKey(record.getFileName(), record.getCruiseName()));
           break;
-        case "SUCCESS":
+        case PipelineStatus.SUCCESS:
           completedFiles.add(new FileKey(record.getFileName(), record.getCruiseName()));
           break;
         default:
