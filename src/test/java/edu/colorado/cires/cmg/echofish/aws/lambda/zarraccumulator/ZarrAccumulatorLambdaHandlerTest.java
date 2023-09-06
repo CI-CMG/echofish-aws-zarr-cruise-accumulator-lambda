@@ -78,7 +78,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.SUCCESS);
+    record.setPipelineStatus(PipelineStatus.SUCCESS_RAW_TO_ZARR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foo");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -88,7 +88,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.FAILURE);
+    record.setPipelineStatus(PipelineStatus.FAILURE_RAW_TO_ZARR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("bar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -98,7 +98,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.SUCCESS);
+    record.setPipelineStatus(PipelineStatus.SUCCESS_RAW_TO_ZARR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foobar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -108,7 +108,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("NOT_HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.PROCESSING);
+    record.setPipelineStatus(PipelineStatus.PROCESSING_RAW_TO_ZARR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foobar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -129,8 +129,8 @@ class ZarrAccumulatorLambdaHandlerTest {
 
     expected.stream()
         .filter(r -> r.getCruiseName().equals("HB0707"))
-        .filter(r -> r.getPipelineStatus().equals(PipelineStatus.SUCCESS))
-        .forEach(r -> r.setPipelineStatus(PipelineStatus.INITIALIZING_CRUISE_ZARR));
+        .filter(r -> r.getPipelineStatus().equals(PipelineStatus.SUCCESS_RAW_TO_ZARR))
+        .forEach(r -> r.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE));
 
     Set<FileInfoRecord> saved = mapper.scan(FileInfoRecord.class, new DynamoDBScanExpression(),
         DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config()).stream().collect(Collectors.toSet());
@@ -152,7 +152,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.SUCCESS);
+    record.setPipelineStatus(PipelineStatus.SUCCESS_ZARR_CRUISE_ACCUMULATOR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foo");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -161,7 +161,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.PROCESSING);
+    record.setPipelineStatus(PipelineStatus.PROCESSING_ZARR_CRUISE_ACCUMULATOR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("bar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -170,7 +170,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.SUCCESS);
+    record.setPipelineStatus(PipelineStatus.SUCCESS_ZARR_CRUISE_ACCUMULATOR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foobar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -179,7 +179,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("NOT_HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.PROCESSING);
+    record.setPipelineStatus(PipelineStatus.PROCESSING_ZARR_CRUISE_ACCUMULATOR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foobar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -212,7 +212,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.INITIALIZING_CRUISE_ZARR);
+    record.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foo");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -221,7 +221,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.INITIALIZING_CRUISE_ZARR);
+    record.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE);
     record.setPipelineTime(TIME.toString());
     record.setFileName("bar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -230,7 +230,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.INITIALIZING_CRUISE_ZARR);
+    record.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foobar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -239,7 +239,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("NOT_HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.PROCESSING);
+    record.setPipelineStatus(PipelineStatus.PROCESSING_ZARR_CRUISE_ACCUMULATOR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foobar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
@@ -272,7 +272,7 @@ class ZarrAccumulatorLambdaHandlerTest {
     record.setCruiseName("NOT_HB0707");
     record.setShipName("Henry_B._Bigelow");
     record.setSensorName("EK60");
-    record.setPipelineStatus(PipelineStatus.SUCCESS);
+    record.setPipelineStatus(PipelineStatus.SUCCESS_ZARR_CRUISE_ACCUMULATOR);
     record.setPipelineTime(TIME.toString());
     record.setFileName("foobar");
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
