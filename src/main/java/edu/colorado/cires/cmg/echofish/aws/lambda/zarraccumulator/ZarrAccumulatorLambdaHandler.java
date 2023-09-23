@@ -161,7 +161,8 @@ public class ZarrAccumulatorLambdaHandler {
         fileKey.getFileName(),
         fileKey.getCruiseName(),
         DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
-    record.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE);
+//    record.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE);
+    record.setPipelineStatus(PipelineStatus.SUCCESS_ZARR_CRUISE_ACCUMULATOR);
     mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
   }
 
@@ -187,7 +188,8 @@ public class ZarrAccumulatorLambdaHandler {
     while (!skip && it.hasNext()) {
       FileInfoRecord record = it.next();
       switch (record.getPipelineStatus()) {
-        case PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE:
+//        case PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE:
+        case PipelineStatus.SUCCESS_ZARR_CRUISE_ACCUMULATOR:
           skip = true;
           break;
         case PipelineStatus.PROCESSING_RAW_TO_ZARR:

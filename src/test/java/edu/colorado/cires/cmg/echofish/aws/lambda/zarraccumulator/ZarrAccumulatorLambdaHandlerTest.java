@@ -130,7 +130,8 @@ class ZarrAccumulatorLambdaHandlerTest {
     expected.stream()
         .filter(r -> r.getCruiseName().equals("HB0707"))
         .filter(r -> r.getPipelineStatus().equals(PipelineStatus.SUCCESS_RAW_TO_ZARR))
-        .forEach(r -> r.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE));
+//        .forEach(r -> r.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE));
+        .forEach(r -> r.setPipelineStatus(PipelineStatus.SUCCESS_ZARR_CRUISE_ACCUMULATOR));
 
     Set<FileInfoRecord> saved = mapper.scan(FileInfoRecord.class, new DynamoDBScanExpression(),
         DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config()).stream().collect(Collectors.toSet());
