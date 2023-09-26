@@ -154,6 +154,28 @@ public class ZarrAccumulatorLambdaHandler {
     }
   }
 
+  private static int getProcessingStatusOrdinal(String ps) {
+    try {
+      ProcessingStatus status = ProcessingStatus.valueOf(ps);
+      return status.ordinal();
+    } catch (IllegalArgumentException e){
+      return Integer.MAX_VALUE;
+    }
+
+  }
+  public enum ProcessingStatus {
+    INITIALIZING_CRUISE_ZARR,
+    PROCESSING_CRUISE_SPLITTER,
+    SUCCESS_CRUISE_SPLITTER,
+    PROCESSING_RAW_TO_ZARR,
+    SUCCESS_RAW_TO_ZARR,
+    PROCESSING_CREATE_EMPTY_ZARR_STORE,
+    SUCCESS_CREATE_EMPTY_ZARR_STORE,
+    FAILURE_RAW_TO_ZARR,
+    FAILURE_CRUISE_SPLITTER,
+    FAILURE_CREATE_EMPTY_ZARR_STORE,
+  }
+
   private void setProcessingFileStatus(FileKey fileKey) {
     LOGGER.info("Updating Database: {}", fileKey);
     DynamoDBMapper mapper = new DynamoDBMapper(client);
@@ -185,25 +207,21 @@ public class ZarrAccumulatorLambdaHandler {
     PaginatedScanList<FileInfoRecord> records = mapper.scan(FileInfoRecord.class, queryExpression,
         DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(configuration.getTableName()).config());
     Iterator<FileInfoRecord> it = records.iterator();
-    while (!skip && it.hasNext()) {
+//    while (!skip && it.hasNext()) {
+    while (it.hasNext()) {
       FileInfoRecord record = it.next();
-      switch (record.getPipelineStatus()) {
-        case PipelineStatus.INITIALIZING_CRUISE_ZARR:  // TODO: Only change from SUCCESS -> FAILURE within each lambda, don't set the variable to next lambdas
-          skip = true;
-          break;
-        case PipelineStatus.PROCESSING_RAW_TO_ZARR:
-          processingFiles.add(new FileKey(record.getFileName(), record.getCruiseName()));
-          break;
-        case PipelineStatus.SUCCESS_RAW_TO_ZARR:
-          completedFiles.add(new FileKey(record.getFileName(), record.getCruiseName()));
-          break;
-        default:
-          break;
+      LOGGER.info("filename {}, pipeline status {}", record.getFileName(), record.getPipelineStatus());
+      Integer status = getProcessingStatusOrdinal(record.getPipelineStatus());
+      if(status <= ProcessingStatus.PROCESSING_RAW_TO_ZARR.ordinal()){
+        processingFiles.add(new FileKey(record.getFileName(), record.getCruiseName()));
+      } else if(status == ProcessingStatus.SUCCESS_RAW_TO_ZARR.ordinal()) {
+        completedFiles.add(new FileKey(record.getFileName(), record.getCruiseName()));
       }
     }
-    boolean completed = !skip && !completedFiles.isEmpty() && processingFiles.isEmpty();
+
+    boolean completed = !completedFiles.isEmpty() && processingFiles.isEmpty();
     LOGGER.info("Records: {}, completed {}", records.size(), completed);
-    System.out.printf("Records: %s, completed %s", records.size(), completed);
+    System.out.printf("Records: %s, completed %s, completedFiles: %s, processingFiles: %s", records.size(), completed, completedFiles.size(), processingFiles.size());
 
     return new CruiseProcessingStatus(completed, completedFiles);
   }
