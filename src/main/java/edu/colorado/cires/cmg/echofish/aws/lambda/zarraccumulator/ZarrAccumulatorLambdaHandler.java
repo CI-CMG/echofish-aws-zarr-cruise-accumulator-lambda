@@ -202,6 +202,9 @@ public class ZarrAccumulatorLambdaHandler {
       }
     }
     boolean completed = !skip && !completedFiles.isEmpty() && processingFiles.isEmpty();
+    LOGGER.info("Records: {}, completed {}", records.size(), completed);
+    System.out.printf("Records: %s, completed %s", records.size(), completed);
+
     return new CruiseProcessingStatus(completed, completedFiles);
   }
 }

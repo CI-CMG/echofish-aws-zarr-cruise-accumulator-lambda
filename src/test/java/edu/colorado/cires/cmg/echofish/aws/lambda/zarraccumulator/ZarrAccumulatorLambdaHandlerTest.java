@@ -268,6 +268,86 @@ class ZarrAccumulatorLambdaHandlerTest {
   }
 
   @Test
+  public void testRedundantMessage() throws Exception {
+    // Tests when a redundant message is received after all files have already been set to
+    // a status of PROCESSING_CREATE_EMPTY_ZARR_STORE is true
+
+    List<FileInfoRecord> expected = new ArrayList<>();
+
+    FileInfoRecord record = new FileInfoRecord();
+    record.setCruiseName("HB0707");
+    record.setShipName("Henry_B._Bigelow");
+    record.setSensorName("EK60");
+    record.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE);
+    record.setPipelineTime(TIME.toString());
+    record.setFileName("foo");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
+    expected.add(record);
+
+    record = new FileInfoRecord();
+    record.setCruiseName("HB0707");
+    record.setShipName("Henry_B._Bigelow");
+    record.setSensorName("EK60");
+    record.setPipelineStatus(PipelineStatus.FAILURE_RAW_TO_ZARR);
+    record.setPipelineTime(TIME.toString());
+    record.setFileName("bar");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
+    expected.add(record);
+
+    record = new FileInfoRecord();
+    record.setCruiseName("HB0707");
+    record.setShipName("Henry_B._Bigelow");
+    record.setSensorName("EK60");
+    record.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE);
+    record.setPipelineTime(TIME.toString());
+    record.setFileName("foobar");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
+    expected.add(record);
+
+    record = new FileInfoRecord();
+    record.setCruiseName("NOT_HB0707");
+    record.setShipName("Henry_B._Bigelow");
+    record.setSensorName("EK60");
+    record.setPipelineStatus(PipelineStatus.PROCESSING_CREATE_EMPTY_ZARR_STORE);
+    record.setPipelineTime(TIME.toString());
+    record.setFileName("foobar");
+    mapper.save(record, DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config());
+    expected.add(record);
+
+
+    SnsNotifier snsNotifier = mock(SnsNotifier.class);
+    when(sns.createNotifier()).thenReturn(snsNotifier);
+
+
+    CruiseProcessingMessage message = new CruiseProcessingMessage();
+    message.setCruiseName("HB0707");
+    message.setShipName("Henry_B._Bigelow");
+    message.setSensorName("EK60");
+    message.setFileName("foo");
+
+    handler.handleRequest(message);
+
+    expected.stream()
+            .filter(r -> r.getCruiseName().equals("HB0707"))
+            .filter(r -> r.getPipelineStatus().equals(PipelineStatus.SUCCESS_RAW_TO_ZARR))
+            .forEach(r -> r.setPipelineStatus(PipelineStatus.INITIALIZING_CRUISE_ZARR));
+
+    Set<FileInfoRecord> saved = mapper.scan(FileInfoRecord.class, new DynamoDBScanExpression(),
+            DynamoDBMapperConfig.TableNameOverride.withTableNameReplacement(TABLE_NAME).config()).stream().collect(Collectors.toSet());
+
+    assertEquals(new HashSet<>(expected), saved);
+
+    CruiseProcessingMessage expectedMessage = new CruiseProcessingMessage();
+    expectedMessage.setCruiseName("HB0707");
+    expectedMessage.setShipName("Henry_B._Bigelow");
+    expectedMessage.setSensorName("EK60");
+
+//    verify(snsNotifier).notify(eq(TOPIC_ARN), eq(expectedMessage));
+    // Expectation is that no message will be sent if one has already been sent.
+    verify(snsNotifier, times(0)).notify(any(), any());
+  }
+
+  @Test
   public void testNoRecords() throws Exception {
 
     FileInfoRecord record = new FileInfoRecord();
