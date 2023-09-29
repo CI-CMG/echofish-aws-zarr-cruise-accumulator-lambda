@@ -43,10 +43,10 @@
 
   <properties>
     <project-root>${project.basedir}</project-root>
-    <maven.compiler.source>11</maven.compiler.source>
-    <maven.compiler.target>11</maven.compiler.target>
+    <maven.compiler.release>11</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <sign.serverId>gpg-sign</sign.serverId>
     <slf4j.version>1.7.32</slf4j.version>
     <javadoc.version>3.3.1</javadoc.version>
     <jacoco.version>0.8.7</jacoco.version>
@@ -95,12 +95,12 @@
     <dependency>
       <groupId>io.github.ci-cmg.echofish</groupId>
       <artifactId>echofish-aws-data-utils</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0</version>
     </dependency>
     <dependency>
       <groupId>io.github.ci-cmg.echofish</groupId>
       <artifactId>echofish-aws-test-utils</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0</version>
       <scope>test</scope>
     </dependency>
 
@@ -169,6 +169,11 @@
   <build>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.11.0</version>
+        </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
@@ -258,10 +263,10 @@
         <configuration>
           <autoVersionSubmodules>true</autoVersionSubmodules>
           <useReleaseProfile>false</useReleaseProfile>
-          <releaseProfiles>release,site-publish</releaseProfiles>
+<!--          <releaseProfiles>release,site-publish</releaseProfiles>-->
+          <releaseProfiles>release</releaseProfiles>
           <goals>deploy site</goals>
           <tagNameFormat>v@{project.version}</tagNameFormat>
-          <arguments>-Pdep-check</arguments>
         </configuration>
       </plugin>
 
@@ -415,8 +420,8 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
-        <version>3.1.0</version>
         <executions>
           <execution>
             <id>cloudformation</id>
@@ -453,10 +458,13 @@
           <plugin>
             <groupId>org.owasp</groupId>
             <artifactId>dependency-check-maven</artifactId>
-            <version>6.5.0</version>
+            <version>8.4.0</version>
             <configuration>
               <skipProvidedScope>true</skipProvidedScope>
               <failBuildOnAnyVulnerability>true</failBuildOnAnyVulnerability>
+              <suppressionFiles>
+                <suppressionFile>owasp-dep-check-suppression.xml</suppressionFile>
+              </suppressionFiles>
             </configuration>
             <executions>
               <execution>
@@ -486,6 +494,20 @@
                 <phase>pre-site</phase>
               </execution>
             </executions>
+            <configuration>
+              <injectAllReactorProjects>true</injectAllReactorProjects>
+              <failOnNoGitDirectory>false</failOnNoGitDirectory>
+              <offline>true</offline>
+              <replacementProperties>
+                <replacementProperty>
+                  <property>git.remote.origin.url</property>
+                  <propertyOutputSuffix>suffix</propertyOutputSuffix>
+                  <token>^.+/(.+).git$</token>
+                  <value>$1</value>
+                  <regex>true</regex>
+                </replacementProperty>
+              </replacementProperties>
+            </configuration>
           </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
@@ -502,7 +524,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-source-plugin</artifactId>
-            <version>3.2.1</version>
             <executions>
               <execution>
                 <id>attach-sources</id>
@@ -513,15 +534,17 @@
             </executions>
           </plugin>
           <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
+            <groupId>org.simplify4u.plugins</groupId>
+            <artifactId>sign-maven-plugin</artifactId>
+            <version>1.0.0</version>
             <executions>
               <execution>
-                <id>sign-artifacts</id>
-                <phase>verify</phase>
                 <goals>
                   <goal>sign</goal>
                 </goals>
+                <configuration>
+                  <skipNoKey>false</skipNoKey>
+                </configuration>
               </execution>
             </executions>
           </plugin>
@@ -538,6 +561,7 @@
             <artifactId>maven-site-plugin</artifactId>
           </plugin>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-resources-plugin</artifactId>
             <executions>
               <execution>
@@ -563,6 +587,7 @@
             </executions>
           </plugin>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-antrun-plugin</artifactId>
             <executions>
               <execution>
@@ -573,47 +598,47 @@
                 </goals>
                 <configuration>
                   <target>
-                    <delete dir="${project.build.directory}/project-documentation" quiet="true" />
+                    <delete dir="${project.build.directory}/project-documentation" quiet="true"/>
                     <exec dir="${project.build.directory}" executable="git">
-                      <arg value="clone" />
-                      <arg value="--depth=1" />
-                      <arg value="git@github.com:CI-CMG/project-documentation.git" />
+                      <arg value="clone"/>
+                      <arg value="--depth=1"/>
+                      <arg value="git@github.com:CI-CMG/project-documentation.git"/>
                     </exec>
                     <exec dir="${project.build.directory}/project-documentation" executable="git">
-                      <arg value="remote" />
-                      <arg value="add" />
-                      <arg value="javadoc" />
-                      <arg value="git@github.com:CI-CMG/project-documentation.git" />
+                      <arg value="remote"/>
+                      <arg value="add"/>
+                      <arg value="javadoc"/>
+                      <arg value="git@github.com:CI-CMG/project-documentation.git"/>
                     </exec>
                     <exec dir="${project.build.directory}/project-documentation" executable="git" failonerror="false">
-                      <arg value="rm" />
-                      <arg value="-r" />
-                      <arg value="${git.remote.origin.url.suffix}/${project.version}" />
+                      <arg value="rm"/>
+                      <arg value="-r"/>
+                      <arg value="${git.remote.origin.url.suffix}/${project.version}"/>
                     </exec>
-                    <mkdir dir="${project.build.directory}/project-documentation/${git.remote.origin.url.suffix}" />
+                    <mkdir dir="${project.build.directory}/project-documentation/${git.remote.origin.url.suffix}"/>
                     <copy todir="${project.build.directory}/project-documentation/${git.remote.origin.url.suffix}">
-                      <fileset file="${project.build.directory}/site-resources/index.html" />
+                      <fileset file="${project.build.directory}/site-resources/index.html"/>
                     </copy>
                     <copy todir="${project.build.directory}/project-documentation/${git.remote.origin.url.suffix}/${project.version}">
-                      <fileset dir="${project.build.directory}/site" />
+                      <fileset dir="${project.build.directory}/site"/>
                     </copy>
                     <exec dir="${project.build.directory}/project-documentation" executable="git">
-                      <arg value="add" />
-                      <arg value="${git.remote.origin.url.suffix}/index.html" />
+                      <arg value="add"/>
+                      <arg value="${git.remote.origin.url.suffix}/index.html"/>
                     </exec>
                     <exec dir="${project.build.directory}/project-documentation" executable="git">
-                      <arg value="add" />
-                      <arg value="${git.remote.origin.url.suffix}/${project.version}" />
+                      <arg value="add"/>
+                      <arg value="${git.remote.origin.url.suffix}/${project.version}"/>
                     </exec>
                     <exec dir="${project.build.directory}/project-documentation" executable="git">
-                      <arg value="commit" />
-                      <arg value="-m" />
-                      <arg value="Update Documentation: ${git.remote.origin.url.suffix}/${project.version}" />
+                      <arg value="commit"/>
+                      <arg value="-m"/>
+                      <arg value="Update Documentation: ${git.remote.origin.url.suffix}/${project.version}"/>
                     </exec>
                     <exec dir="${project.build.directory}/project-documentation" executable="git">
-                      <arg value="push" />
-                      <arg value="javadoc" />
-                      <arg value="trunk" />
+                      <arg value="push"/>
+                      <arg value="javadoc"/>
+                      <arg value="master"/>
                     </exec>
                   </target>
                 </configuration>
