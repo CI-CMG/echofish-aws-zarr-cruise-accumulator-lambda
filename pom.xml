@@ -4,7 +4,7 @@
 
   <groupId>io.github.ci-cmg.echofish</groupId>
   <artifactId>echofish-aws-zarr-cruise-accumulator-lambda</artifactId>
-  <version>1.0.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
 
   <name>${project.groupId}:${project.artifactId}</name>
   <description>EchoFish AWS Lambda that acts as an EIP accumulator for processed cruise zarr files</description>
@@ -29,7 +29,7 @@
     <connection>scm:git:git@github.com:CI-CMG/echofish-aws-zarr-cruise-accumulator-lambda.git</connection>
     <developerConnection>scm:git:git@github.com:CI-CMG/echofish-aws-zarr-cruise-accumulator-lambda.git</developerConnection>
     <url>https://github.com/CI-CMG/echofish-aws-zarr-cruise-accumulator-lambda</url>
-    <tag>1.0</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <distributionManagement>
